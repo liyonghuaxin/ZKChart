@@ -42,18 +42,14 @@ void GGPathAddRangePoints(CGMutablePathRef ref, CGPoint * points, NSRange range)
         if (CGPointEqualToPoint(point, CGPointMake(FLT_MIN, FLT_MIN))) {
             
             isMovePoint = YES;
-            
             continue;
         }
         
         if (isMovePoint) {
-            
             isMovePoint = NO;
-            
             CGPathMoveToPoint(ref, NULL, point.x, point.y);
         }
         else {
-            
             CGPathAddLineToPoint(ref, NULL, point.x, point.y);
         }
     }

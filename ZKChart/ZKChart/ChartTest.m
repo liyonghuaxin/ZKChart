@@ -9,6 +9,87 @@
 #import "ChartTest.h"
 #import "KLineData.h"
 
+#import "BaseIndexLayer.h"
+#import "NSObject+FireBlock.h"
+
+#import "LineCanvas.h"
+#import "LineDataSet.h"
+#import "LineData.h"
+#import "GridBackCanvas.h"
+#import "LineChart.h"
+
+@implementation BitTimeModel
+
+- (CGFloat)ggTimeAveragePrice
+{
+    return _avg_price;
+}
+
+- (CGFloat)ggTimePrice
+{
+    return _price;
+}
+
+- (CGFloat)ggTimeClosePrice
+{
+    return _price / (1 + _price_change_rate / 100);
+}
+
+- (NSDate *)ggTimeDate
+{
+    return _ggDate;
+}
+
+- (CGFloat)ggVolume
+{
+    return _volume;
+}
+
+- (NSDate *)ggVolumeDate
+{
+    return _ggDate;
+}
+
+/**
+ * 查询Value颜色
+ *
+ * @{@"key" : [UIColor redColor]}
+ */
+- (NSDictionary *)queryKeyForColor
+{
+    return @{@"价格" : [UIColor blackColor],
+             @"均价" : [UIColor blackColor],
+             @"成交量" : [UIColor blackColor]};
+}
+
+/**
+ * 查询Key颜色
+ *
+ * @{@"key" : [UIColor redColor]}
+ */
+- (NSDictionary *)queryValueForColor
+{
+    return @{[NSString stringWithFormat:@"%.2f", _price] : [UIColor blackColor],
+             [NSString stringWithFormat:@"%.2f", _avg_price] : [UIColor blackColor],
+             [NSString stringWithFormat:@"%zd手", _volume] : [UIColor blackColor]};
+}
+
+/**
+ * 键值对
+ *
+ * @[@{@"key" : @"value"},
+ *   @{@"key" : @"value"},
+ *   @{@"key" : @"value"}]
+ */
+- (NSArray <NSDictionary *> *)valueForKeyArray
+{
+    return @[@{@"价格" : [NSString stringWithFormat:@"%.2f", _price]},
+             @{@"均价" : [NSString stringWithFormat:@"%.2f", _avg_price]},
+             @{@"成交量" : [NSString stringWithFormat:@"%zd手", _volume]}];
+}
+
+@end
+
 @interface ChartTest ()<UIScrollViewDelegate>{
     UIView *bgView;
     
@@ -17,6 +98,9 @@
     CGFloat shapeInterval;
     CGSize contentSize;
 }
+
+@property (nonatomic, strong) BaseIndexLayer * mLineIndexLayer;
+
 
 @property (nonatomic, assign) CGFloat kLineProportion;  ///< 主图占比 默认 .6f
 
@@ -61,8 +145,8 @@
     //数据
     NSData *dataStock = [NSData dataWithContentsOfFile:[self stockWeekDataJsonPath]];
     NSArray *stockJson = [NSJSONSerialization JSONObjectWithData:dataStock options:0 error:nil];
-    NSArray <KLineData *> *datas = [[[KLineData arrayForArray:stockJson class:[KLineData class]] reverseObjectEnumerator] allObjects];
-    _kLineArray = datas;
+    NSArray <MinuteAbstract, VolumeAbstract> * timeAry = (NSArray <MinuteAbstract, VolumeAbstract> *) [BaseModel arrayForArray:stockJson class:[BitTimeModel class]];
+    _kLineArray = timeAry;
     
     //UI
     bgView = [[UIView alloc] init];
@@ -82,11 +166,12 @@
     [_scrollView.layer addSublayer:self.redVolumLayer];
     [_scrollView.layer addSublayer:self.greenVolumLayer];
     [bgView addSubview:_scrollView];
+    
     //计算scrollview的contentsize
     contentSize = CGSizeMake((shapeInterval + shapeWidth) * _kLineArray.count, chartHeight);
     self.scrollView.contentSize = contentSize;
     self.backScrollView.contentSize = contentSize;
-    
+
     //手势
     UIPinchGestureRecognizer * pinchGestureRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinchesViewOnGesturer:)];
     [bgView addGestureRecognizer:pinchGestureRecognizer];
@@ -107,8 +192,8 @@
     self.volumScaler.rect = CGRectMake(0, 0, self.redVolumLayer.gg_width, self.redVolumLayer.gg_height);
     self.volumScaler.barWidth = shapeWidth;//lyh 最窄1?
     
-    //更新视图
-    [self updateSubLayer];
+    [self updateChart];
+
 }
 #pragma mark - 更新视图
 
@@ -116,23 +201,34 @@
 {
     if (_kLineArray.count == 0) { return; }
     
-    //渲染器  花布 颜色等属性pei k
+    //渲染器  画布 颜色等属性
 //    [self baseConfigRendererAndLayer];
     
-    [self kLineSubLayerRespond];
-    
-    // 指标层
-//    [self updateKLineIndexLayer:_kLineIndexIndex];
-//    [self updateVolumIndexLayer:_volumIndexIndex];
+    [self subLayerRespond];
+    [self updateMinuteLine];
 }
 
-- (void)kLineSubLayerRespond
+- (void)subLayerRespond
 {
-    [self baseConfigKLineLayer];
+    [self baseConfigLayer];
+    
     [self updateSubLayer];
 }
 
-- (void)baseConfigKLineLayer{
+- (void)updateMinuteLine{
+    runMainThreadWithBlock(^{
+        [_mLineIndexLayer removeFromSuperlayer];
+        _mLineIndexLayer = [[BaseIndexLayer alloc] init];
+        _mLineIndexLayer.frame = CGRectMake(0, 0, contentSize.width, bgView.gg_height*_kLineProportion);
+        [_mLineIndexLayer setKLineArray:_kLineArray];
+        _mLineIndexLayer.currentKLineWidth = shapeWidth;
+        [self.scrollView.layer addSublayer:_mLineIndexLayer];
+    
+        [self updateSubLayer];
+    });
+}
+
+- (void)baseConfigLayer{
     shapeWidth = bgView.gg_width / _kLineCountVisibale - _kInterval;
     shapeInterval = _kInterval;
 
@@ -147,6 +243,8 @@
     
     self.volumScaler.rect = CGRectMake(0, 0, contentSize.width, self.redVolumLayer.gg_height);
     self.volumScaler.barWidth = shapeWidth;
+    self.mLineIndexLayer.gg_width = contentSize.width;
+    
 }
 
 #pragma mark - rect
@@ -167,30 +265,18 @@
     return CGRectMake(0, INDEX_STRING_INTERVAL, bgView.frame.size.width, bgView.frame.size.height * _kLineProportion - INDEX_STRING_INTERVAL);
 }
 
-- (NSString *)stockWeekDataJsonPath{
-    return [[NSBundle mainBundle] pathForResource:@"week_k_data_60087" ofType:@"json"];
-}
-
-#pragma mark - 实时更新
-/** 柱状图实时更新 */
-- (void)updateVolumLayerWithRange:(NSRange)range
+- (void)setFrame:(CGRect)frame
 {
-    // 计算柱状图最大最小
-    CGFloat max = FLT_MIN;
-    CGFloat min = FLT_MAX;
-
-    //除100000后得到max
-    [_kLineArray getMax:&max min:&min selGetter:@selector(ggVolume) range:range base:0.1];
-    
-    // 更新成交量
-    self.volumScaler.min = 0;
-    self.volumScaler.max = max;
-    [self.volumScaler updateScalerWithRange:range];//定标器 确定部分参数
-    [self updateVolumLayer:range];//用贝塞尔曲线绘图
-    
+    _scrollView.frame = CGRectMake(0, 0, frame.size.width, frame.size.height);
+    _backScrollView.frame = CGRectMake(0, 0, frame.size.width, frame.size.height);
+}
+//设置成交量层
+- (void)setVolumRect:(CGRect)rect{
+    self.redVolumLayer.frame = rect;
+    self.greenVolumLayer.frame = rect;
 }
 
-#pragma mark --------------------------------
+#pragma mark -------------------
 
 /**
  * 成交量视图是否为红色
@@ -209,40 +295,9 @@
     return kLineObj.ggOpen > kLineObj.ggClose;
 }
 
-
-- (void)setFrame:(CGRect)frame
-{
-    _scrollView.frame = CGRectMake(0, 0, frame.size.width, frame.size.height);
-    _backScrollView.frame = CGRectMake(0, 0, frame.size.width, frame.size.height);
-}
-//设置成交量层
-- (void)setVolumRect:(CGRect)rect{
-    self.redVolumLayer.frame = rect;
-    self.greenVolumLayer.frame = rect;
-}
-
-/**
- * 视图滚动
- */
-- (void)scrollViewContentSizeDidChange
-{
-
-    CGPoint contentOffset = self.scrollView.contentOffset;
-    
-    if (_scrollView.contentOffset.x < 0) {
-        
-        contentOffset = CGPointMake(0, 0);
-    }
-    
-    if (_scrollView.contentOffset.x + _scrollView.frame.size.width > _scrollView.contentSize.width) {
-        
-        contentOffset = CGPointMake(_scrollView.contentSize.width - _scrollView.frame.size.width, 0);
-    }
-
-    [self.backScrollView setContentOffset:contentOffset];
-    
-    [self updateSubLayer];
-
+- (NSString *)stockWeekDataJsonPath{
+    //600887_five_day  week_k_data_60087
+    return [[NSBundle mainBundle] pathForResource:@"600887_five_day" ofType:@"json"];
 }
 
 #pragma mark - 实时更新
@@ -259,24 +314,51 @@
     NSRange range = NSMakeRange(index, len);
 
     // 更新视图
+    [self updateMinuteLayerWithRange:range];
     [self updateVolumLayerWithRange:range];
 }
 
+/** 柱状图实时更新 */
+- (void)updateVolumLayerWithRange:(NSRange)range
+{
+    // 计算柱状图最大最小
+    CGFloat max = FLT_MIN;
+    CGFloat min = FLT_MAX;
+    
+    [_kLineArray getMax:&max min:&min selGetter:@selector(ggVolume) range:range base:0.1];
+    
+    // 更新成交量
+    self.volumScaler.min = 0;
+    self.volumScaler.max = max;
+    [self.volumScaler updateScalerWithRange:range];//定标器 确定部分参数
+    [self updateVolumLayer:range];//用贝塞尔曲线绘图
+    
+}
 
 /**
  * 局部更新成交量
  *
  * range 成交量更新k线的区域, CGRangeMAx(range) <= volumScaler.lineObjAry.count
  */
-- (void)updateVolumLayer:(NSRange)range
-{
+- (void)updateVolumLayer:(NSRange)range{
     CGMutablePathRef refRed = CGPathCreateMutable();
     CGMutablePathRef refGreen = CGPathCreateMutable();
     
     for (NSInteger i = range.location; i < NSMaxRange(range); i++) {
         CGRect shape = self.volumScaler.barRects[i];
-        NSObject * obj = self.volumScaler.lineObjAry[i];
-        [self volumIsRed:obj] ? GGPathAddCGRect(refRed, shape) : GGPathAddCGRect(refGreen, shape);
+        BitTimeModel * obj = (BitTimeModel *)self.volumScaler.lineObjAry[i];
+        if (i == 0) {
+            GGPathAddCGRect(refGreen, shape);
+        }else{
+            BitTimeModel *previousObj = (BitTimeModel *)self.volumScaler.lineObjAry[i-1];
+            if (previousObj.price >= obj.price) {
+                //绿跌红涨
+                GGPathAddCGRect(refGreen, shape);
+            }else{
+                GGPathAddCGRect(refRed, shape);
+            }
+        }
+//        [self volumIsRed:obj] ? GGPathAddCGRect(refRed, shape) : GGPathAddCGRect(refGreen, shape);
     }
     
     self.redVolumLayer.path = refRed;
@@ -285,6 +367,100 @@
     self.greenVolumLayer.path = refGreen;
     CGPathRelease(refGreen);
 }
+
+- (void)updateMinuteLayerWithRange:(NSRange)range{
+    //--------------------- 方案一
+    //lyh 会崩 改 mLineIndexLayer.sublayers = nil
+//    for (CAShapeLayer *layer in _mLineIndexLayer.sublayers) {
+//        [layer removeFromSuperlayer];
+//    }
+//    _mLineIndexLayer.sublayers = nil;
+//    // 计算最大最小
+//    CGFloat max = FLT_MIN;
+//    CGFloat min = FLT_MAX;
+//    //    [_kLineIndexLayer getIndexWithRange:range max:&max min:&min];
+//    for (NSInteger i = range.location; i<range.location+range.length; i++) {
+//        BitTimeModel *model = (BitTimeModel *)_kLineArray[i];
+//        max = model.ggTimePrice>max?model.ggTimePrice:max;
+//        min = model.ggTimePrice<min?model.ggTimePrice:min;
+//    }
+//    [_mLineIndexLayer updateLayerWithRange:range max:max min:min];
+//
+//    DLineScaler * lineScaler = [[DLineScaler alloc] init];
+//    lineScaler.max = max;
+//    lineScaler.min = min;
+//    lineScaler.rect = CGRectMake(0, 0, _mLineIndexLayer.gg_width, _mLineIndexLayer.gg_height);
+//    NSMutableArray *array = [NSMutableArray array];
+//    for (BitTimeModel *model in _kLineArray) {
+//        [array addObject: @(model.price)];
+//    }
+//    lineScaler.dataAry = array;
+//    [lineScaler updateScalerWithRange:range];
+//
+//    CAShapeLayer * layer = [CAShapeLayer layer];
+//    layer.fillColor = [UIColor clearColor].CGColor;
+//    layer.strokeColor = [C_HEX(0x177eff) CGColor];
+//    layer.lineWidth = 1;
+//    layer.frame = CGRectMake(0, 0, _mLineIndexLayer.gg_width, _mLineIndexLayer.gg_height);
+//    [_mLineIndexLayer addSublayer:layer];
+//
+//    CGMutablePathRef ref = CGPathCreateMutable();
+//    GGPathAddRangePoints(ref, lineScaler.linePoints, range);
+//    layer.path = ref;
+//    CGPathRelease(ref);
+//
+//    //填充
+//    CAShapeLayer * fillLayer = [CAShapeLayer layer];
+//    fillLayer.fillColor = [C_HEX(0xf1f8ff) colorWithAlphaComponent:1.0f].CGColor;
+//    fillLayer.lineWidth = 1;
+//    fillLayer.frame = CGRectMake(0, 0, _mLineIndexLayer.gg_width, _mLineIndexLayer.gg_height);
+//    [_mLineIndexLayer addSublayer:fillLayer];
+//
+//    CGMutablePathRef refFill = CGPathCreateMutable();
+//    GGPathAddRangePoints(refFill, lineScaler.linePoints, range);
+//    CGPathAddLineToPoint(refFill, NULL, lineScaler.linePoints[range.location+range.length - 1].x, CGRectGetMaxY(fillLayer.frame));
+//    CGPathAddLineToPoint(refFill, NULL, 0, CGRectGetMaxY(fillLayer.frame));
+//    CGPathAddLineToPoint(refFill, NULL, 0, lineScaler.linePoints[range.location].y);
+//    fillLayer.path = refFill;
+//    CGPathRelease(refFill);
+    
+    //--------------------- 方案二
+    NSMutableArray *array = [NSMutableArray array];
+    for (BitTimeModel *model in _kLineArray) {
+        [array addObject: @(model.price)];
+    }
+    [[bgView viewWithTag:100] removeFromSuperview];
+
+    LineData * line = [[LineData alloc] init];
+    line.lineWidth = 1;
+    line.lineColor = C_HEX(0x177eff);
+    line.lineFillColor = [C_HEX(0xf1f8ff) colorWithAlphaComponent:.8f];
+    line.dataAry =  [array subarrayWithRange:range];
+    line.dataFormatter = @"%.f 分";
+    line.gradientFillColors = @[(__bridge id)C_HEX(0xf1f8ff).CGColor, (__bridge id)[UIColor whiteColor].CGColor];
+    line.locations = @[@0.7, @1];
+    line.shapeLineWidth = 1;
+//    line.dashPattern = @[@2, @2];//折线虚线样式
+
+    LineDataSet * lineSet = [[LineDataSet alloc] init];
+    lineSet.lineAry = @[line];
+    
+    float x = 0.0;
+    if (_scrollView.contentOffset.x < 0){
+        x = 0.0;
+    }else if (_scrollView.contentSize.width -_scrollView.contentOffset.x < bgView.gg_width){
+        x = _scrollView.contentSize.width - bgView.gg_width;
+    }else{
+        x = _scrollView.contentOffset.x;
+    }
+    LineChart * lineChart = [[LineChart alloc] initWithFrame:CGRectMake(x, 0, bgView.gg_width, bgView.gg_height*_kLineProportion)];
+    lineChart.tag = 100;
+    lineChart.lineDataSet = lineSet;
+    [lineChart drawLineChart];
+    [self.scrollView addSubview:lineChart];
+
+}
+
 #pragma mark - 手势
 
 /** 放大手势 */
@@ -328,7 +504,7 @@
         _kLineCountVisibale = _kLineCountVisibale < _kMinCountVisibale ? _kMinCountVisibale : _kLineCountVisibale;
         _kLineCountVisibale = _kLineCountVisibale > _kMaxCountVisibale ? _kMaxCountVisibale : _kLineCountVisibale;
         
-        [self kLineSubLayerRespond];
+        [self subLayerRespond];
         
         // 定位中间的k线
         CGFloat shape_x = (_zoomCenterIndex + .5) * shapeInterval + (_zoomCenterIndex + .5) * shapeWidth;
@@ -383,6 +559,30 @@
     [self scrollViewContentSizeDidChange];
 }
 
+/**
+ * 视图滚动
+ */
+- (void)scrollViewContentSizeDidChange
+{
+    
+    CGPoint contentOffset = self.scrollView.contentOffset;
+    
+    if (_scrollView.contentOffset.x < 0) {
+        
+        contentOffset = CGPointMake(0, 0);
+    }
+    
+    if (_scrollView.contentOffset.x + _scrollView.frame.size.width > _scrollView.contentSize.width) {
+        
+        contentOffset = CGPointMake(_scrollView.contentSize.width - _scrollView.frame.size.width, 0);
+    }
+    
+    [self.backScrollView setContentOffset:contentOffset];
+    
+    [self updateSubLayer];
+    
+}
+
 /** 结束刷新状态 */
 - (void)endLoadingState
 {
@@ -394,6 +594,8 @@
 GGLazyGetMethod(CAShapeLayer, redVolumLayer);
 GGLazyGetMethod(CAShapeLayer, greenVolumLayer);
 GGLazyGetMethod(DBarScaler, volumScaler);
+
+GGLazyGetMethod(DLineScaler, lineScaler);
 
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];

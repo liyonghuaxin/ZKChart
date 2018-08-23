@@ -221,7 +221,7 @@
     CGPoint avgPoint = self.averageScaler.linePoints[index];
     self.avgCircle.circle = GGCirclePointMake(CGPointMake(avgPoint.x, avgPoint.y - self.queryPriceView.gg_top), 2);
     self.priceCircle.circle = GGCirclePointMake(CGPointMake(point.x, point.y - self.queryPriceView.gg_top), 2);
-    self.avgCircle.fillColor = [UIColor redColor];//self.avgColor;
+    self.avgCircle.fillColor = self.avgColor;
     self.priceCircle.fillColor = self.lineColor;
     [self.queryPriceView setCenterPoint:CGPointMake(point.x, velocity.y - self.queryPriceView.gg_top)];
 }

@@ -17,22 +17,19 @@ LineScaler y_axiScaler(CGFloat max, CGFloat min, CGRect rect)
     CGFloat div = max - min;
     div = div == 0 ? 1 : div;
     CGFloat pix = dis / div;
-    
+
     CGFloat zero = min > 0 ? dis + rect.origin.y : dis - pix * fabs(min) + rect.origin.y;
     
     return ^(double val) {
         
         if (val < 0) {
-            
             return zero + fabs(val) * pix;
         }
         else {
             
             if (min < 0) {
-                
                 return zero - fabs(val) * pix;
             }
-            
             return zero - fabs(val - min) * pix;
         }
     };
