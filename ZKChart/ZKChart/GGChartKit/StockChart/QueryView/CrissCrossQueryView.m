@@ -201,7 +201,7 @@ GGLazyGetMethod(NSMutableDictionary, dicLable);
     
     _yAxisLable.point = CGPointMake(_yAxisOffsetX, center.y);
     _xAxisLable.point = CGPointMake(center.x + _lineWidth, _xAxisOffsetY);
-    
+
     [self updateQueryLayerWithCenter:center];
 }
 

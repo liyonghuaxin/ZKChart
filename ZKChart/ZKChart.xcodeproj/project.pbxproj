@@ -162,6 +162,7 @@
 		049ADE732116B38600132C02 /* BaseModel.m in Sources */ = {isa = PBXBuildFile; fileRef = 049ADE712116B38500132C02 /* BaseModel.m */; };
 		049ADE772116B45600132C02 /* week_k_data_60087.json in Resources */ = {isa = PBXBuildFile; fileRef = 049ADE762116B45500132C02 /* week_k_data_60087.json */; };
 		049ADE7D2116BC5000132C02 /* ChartTest.m in Sources */ = {isa = PBXBuildFile; fileRef = 049ADE7C2116BC5000132C02 /* ChartTest.m */; };
+		8B72EDBD8EC8400E3E0870CF /* libPods-ZKChart.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EBBEEA65A2A78043693889A9 /* libPods-ZKChart.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -512,6 +513,9 @@
 		049ADE762116B45500132C02 /* week_k_data_60087.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = week_k_data_60087.json; sourceTree = "<group>"; };
 		049ADE7B2116BC5000132C02 /* ChartTest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ChartTest.h; sourceTree = "<group>"; };
 		049ADE7C2116BC5000132C02 /* ChartTest.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ChartTest.m; sourceTree = "<group>"; };
+		172E7226182BC6E05E79743E /* Pods-ZKChart.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ZKChart.release.xcconfig"; path = "Pods/Target Support Files/Pods-ZKChart/Pods-ZKChart.release.xcconfig"; sourceTree = "<group>"; };
+		98765016AC68D47BDF971FB7 /* Pods-ZKChart.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ZKChart.debug.xcconfig"; path = "Pods/Target Support Files/Pods-ZKChart/Pods-ZKChart.debug.xcconfig"; sourceTree = "<group>"; };
+		EBBEEA65A2A78043693889A9 /* libPods-ZKChart.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-ZKChart.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -519,6 +523,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8B72EDBD8EC8400E3E0870CF /* libPods-ZKChart.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -567,6 +572,8 @@
 				049ADC812116AC6D00132C02 /* ZKChartTests */,
 				049ADC8C2116AC6D00132C02 /* ZKChartUITests */,
 				049ADC672116AC6C00132C02 /* Products */,
+				4E75BA2C31FED937ADF13AE1 /* Pods */,
+				458E30E24C8442A8AB65BC62 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -1259,6 +1266,23 @@
 			path = LuaContext;
 			sourceTree = "<group>";
 		};
+		458E30E24C8442A8AB65BC62 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				EBBEEA65A2A78043693889A9 /* libPods-ZKChart.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		4E75BA2C31FED937ADF13AE1 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				98765016AC68D47BDF971FB7 /* Pods-ZKChart.debug.xcconfig */,
+				172E7226182BC6E05E79743E /* Pods-ZKChart.release.xcconfig */,
+			);
+			name = Pods;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -1266,6 +1290,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 049ADC922116AC6D00132C02 /* Build configuration list for PBXNativeTarget "ZKChart" */;
 			buildPhases = (
+				1BB3244A592DD0C15A37883A /* [CP] Check Pods Manifest.lock */,
 				049ADC622116AC6C00132C02 /* Sources */,
 				049ADC632116AC6C00132C02 /* Frameworks */,
 				049ADC642116AC6C00132C02 /* Resources */,
@@ -1386,6 +1411,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1BB3244A592DD0C15A37883A /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-ZKChart-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		049ADC622116AC6C00132C02 /* Sources */ = {
@@ -1705,6 +1751,7 @@
 		};
 		049ADC932116AC6D00132C02 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 98765016AC68D47BDF971FB7 /* Pods-ZKChart.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = NO;
@@ -1726,6 +1773,7 @@
 		};
 		049ADC942116AC6D00132C02 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 172E7226182BC6E05E79743E /* Pods-ZKChart.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = NO;

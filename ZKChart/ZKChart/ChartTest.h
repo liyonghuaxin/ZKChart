@@ -25,6 +25,11 @@
 @property (nonatomic , assign) CGFloat avg_price;
 @property (nonatomic , strong) NSDate * ggDate;
 
+@property (nonatomic , strong) NSNumber *transactionAmount;
+@property (nonatomic , strong) NSNumber *marketValue;
+@property (nonatomic , strong) NSNumber *timestamp;
+@property (nonatomic , strong) NSNumber *priceUsd;
+
 @end
 
 @interface ChartTest : BaseViewController

@@ -17,6 +17,25 @@
 #import "LineData.h"
 #import "GridBackCanvas.h"
 #import "LineChart.h"
+#import "CrissCrossQueryView.h"
+#import "NSDate+GGDate.h"
+/*
+ 1天
+ https://fastmarket.niuyan.com/api/v4/app/coin/chart?coin_id=bitcoin&lan=zh-cn&type=1d
+ 1周
+ https://fastmarket.niuyan.com/api/v4/app/coin/chart?coin_id=bitcoin&lan=zh-cn&type=7d
+ 1月
+ https://fastmarket.niuyan.com/api/v4/app/coin/chart?coin_id=bitcoin&lan=zh-cn&type=1m
+ 3月
+ https://fastmarket.niuyan.com/api/v4/app/coin/chart?coin_id=bitcoin&lan=zh-cn&type=3m
+ 1年
+ https://fastmarket.niuyan.com/api/v4/app/coin/chart?coin_id=bitcoin&lan=zh-cn&type=1y
+ 今年
+ https://fastmarket.niuyan.com/api/v4/app/coin/chart?coin_id=bitcoin&lan=zh-cn&type=ytd
+ 所有
+ https://fastmarket.niuyan.com/api/v4/app/coin/chart?coin_id=bitcoin&lan=zh-cn&type=all
+ */
+
 
 @implementation BitTimeModel
 
@@ -97,6 +116,8 @@
     CGFloat shapeWidth;
     CGFloat shapeInterval;
     CGSize contentSize;
+    
+    NSRange tempRange;
 }
 
 @property (nonatomic, strong) BaseIndexLayer * mLineIndexLayer;
@@ -104,7 +125,7 @@
 
 @property (nonatomic, assign) CGFloat kLineProportion;  ///< 主图占比 默认 .6f
 
-@property (nonatomic, readonly) NSArray <id <KLineAbstract, VolumeAbstract, QueryViewAbstract> > * kLineArray;    ///< k线数组
+@property (nonatomic, readonly) NSArray <id <MinuteAbstract, VolumeAbstract, QueryViewAbstract> > * kLineArray;    ///< k线数组
 @property (nonatomic, assign) CGFloat kInterval;    ///< k线之间的间隔
 
 @property (nonatomic, assign) NSInteger kLineCountVisibale;     ///< 一屏幕显示多少根k线     默认60
@@ -120,6 +141,12 @@
 @property (nonatomic, assign) CGFloat zoomCenterSpacingLeft;    ///< 缩放中心K线位置距离左边的距离
 @property (nonatomic, assign) NSUInteger zoomCenterIndex;     ///< 中心点k线
 
+@property (nonatomic, strong) GGCanvas * backCanvas;        ///< 背景层
+@property (nonatomic, strong) GGLineRenderer * lineRenderer;    ///< 虚线
+
+@property (nonatomic, strong) CrissCrossQueryView * queryPriceView;     ///< 查价层
+@property (nonatomic, strong) NSArray * bottomTitleArray;       ///< 底部轴
+
 @end
 
 @implementation ChartTest
@@ -127,6 +154,31 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view.
+    [self initSubviews];
+    [self requestData];
+}
+
+- (void)requestData{
+    //数据
+    NSData *dataStock = [NSData dataWithContentsOfFile:[self stockWeekDataJsonPath]];
+    NSArray *stockJson = [NSJSONSerialization JSONObjectWithData:dataStock options:0 error:nil];
+    NSArray <MinuteAbstract, VolumeAbstract> * timeAry = (NSArray <MinuteAbstract, VolumeAbstract> *) [BaseModel arrayForArray:stockJson class:[BitTimeModel class]];
+    [timeAry enumerateObjectsUsingBlock:^(BitTimeModel * obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        obj.ggDate = [NSDate dateWithString:obj.date format:@"yyyy-MM-dd HH:mm:ss"];
+    }];
+    _kLineArray = timeAry;
+    
+    //定标器
+    self.volumScaler = [[DBarScaler alloc] init];
+    [self.volumScaler setObjAry:_kLineArray
+                    getSelector:@selector(ggVolume)];
+    self.volumScaler.rect = CGRectMake(0, 0, self.redVolumLayer.gg_width, self.redVolumLayer.gg_height);
+    self.volumScaler.barWidth = shapeWidth;//lyh 最窄1?
+    
+    [self updateChart];
+}
+
+- (void)initSubviews{
     _currentZoom = -.001f;
     _kLineProportion = .6f;
     
@@ -138,15 +190,9 @@
     _kInterval = 3;//k线间的距离
     float chartWidth = SCREEN_WIDTH-20;
     float chartHeight = 250;
-
+    
     shapeInterval = _kInterval;//间隔
     shapeWidth = chartWidth / _kLineCountVisibale - _kInterval;//柱状图宽度
-
-    //数据
-    NSData *dataStock = [NSData dataWithContentsOfFile:[self stockWeekDataJsonPath]];
-    NSArray *stockJson = [NSJSONSerialization JSONObjectWithData:dataStock options:0 error:nil];
-    NSArray <MinuteAbstract, VolumeAbstract> * timeAry = (NSArray <MinuteAbstract, VolumeAbstract> *) [BaseModel arrayForArray:stockJson class:[BitTimeModel class]];
-    _kLineArray = timeAry;
     
     //UI
     bgView = [[UIView alloc] init];
@@ -171,10 +217,20 @@
     contentSize = CGSizeMake((shapeInterval + shapeWidth) * _kLineArray.count, chartHeight);
     self.scrollView.contentSize = contentSize;
     self.backScrollView.contentSize = contentSize;
-
+    
+    //背景
+    [bgView.layer addSublayer:self.backCanvas];
+    self.backCanvas.frame = CGRectMake(0, 0, chartWidth, chartHeight);
+    //查价层
+    self.queryPriceView.frame = CGRectMake(0, 15, chartWidth, chartHeight);
+    [bgView addSubview:self.queryPriceView];
+    
     //手势
     UIPinchGestureRecognizer * pinchGestureRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinchesViewOnGesturer:)];
     [bgView addGestureRecognizer:pinchGestureRecognizer];
+    
+    UILongPressGestureRecognizer * longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(longPressViewOnGesturer:)];
+    [bgView addGestureRecognizer:longPress];
     
     //配置
     self.redVolumLayer.strokeColor = [UIColor redColor].CGColor;
@@ -184,49 +240,55 @@
     
     //确定redVolumLayer 和 greenVolumLayer的frame
     [self setVolumRect:CGRectMake(0, chartHeight*_kLineProportion, contentSize.width, chartHeight*(1-_kLineProportion))];//确定 redVolumLayer greenVolumLayer 的frame
-    
-    //定标器
-    self.volumScaler = [[DBarScaler alloc] init];
-    [self.volumScaler setObjAry:_kLineArray
-                    getSelector:@selector(ggVolume)];
-    self.volumScaler.rect = CGRectMake(0, 0, self.redVolumLayer.gg_width, self.redVolumLayer.gg_height);
-    self.volumScaler.barWidth = shapeWidth;//lyh 最窄1?
-    
-    [self updateChart];
-
 }
+
 #pragma mark - 更新视图
 
 - (void)updateChart
 {
     if (_kLineArray.count == 0) { return; }
     
+    [self.lineScaler setObjAry:_kLineArray getSelector:@selector(ggTimePrice)];
+
     //渲染器  画布 颜色等属性
 //    [self baseConfigRendererAndLayer];
     
     [self subLayerRespond];
-    [self updateMinuteLine];
+//    [self updateMinuteLine];
+    
+    [self.backCanvas addRenderer:self.lineRenderer];
+}
+
+- (void)configLineScaler
+{
+//    self.lineScaler.max = _KTimeChartMaxPrice;
+//    self.lineScaler.min = _KTimeChartMinPrice;
+//    self.lineScaler.xMaxCount = self.timeType == TimeDay ? _bottomTitleArray.count * 240 : 240;
+    self.lineScaler.xMaxCount = _kLineCountVisibale;
+
+    self.lineScaler.xRatio = 0;
 }
 
 - (void)subLayerRespond
 {
     [self baseConfigLayer];
-    
+    [self configLineScaler];
+
     [self updateSubLayer];
 }
 
-- (void)updateMinuteLine{
-    runMainThreadWithBlock(^{
-        [_mLineIndexLayer removeFromSuperlayer];
-        _mLineIndexLayer = [[BaseIndexLayer alloc] init];
-        _mLineIndexLayer.frame = CGRectMake(0, 0, contentSize.width, bgView.gg_height*_kLineProportion);
-        [_mLineIndexLayer setKLineArray:_kLineArray];
-        _mLineIndexLayer.currentKLineWidth = shapeWidth;
-        [self.scrollView.layer addSublayer:_mLineIndexLayer];
-    
-        [self updateSubLayer];
-    });
-}
+//- (void)updateMinuteLine{
+//    runMainThreadWithBlock(^{
+//        [_mLineIndexLayer removeFromSuperlayer];
+//        _mLineIndexLayer = [[BaseIndexLayer alloc] init];
+//        _mLineIndexLayer.frame = CGRectMake(0, 0, contentSize.width, bgView.gg_height*_kLineProportion);
+//        [_mLineIndexLayer setKLineArray:_kLineArray];
+//        _mLineIndexLayer.currentKLineWidth = shapeWidth;
+//        [self.scrollView.layer addSublayer:_mLineIndexLayer];
+//
+//        [self updateSubLayer];
+//    });
+//}
 
 - (void)baseConfigLayer{
     shapeWidth = bgView.gg_width / _kLineCountVisibale - _kInterval;
@@ -243,6 +305,7 @@
     
     self.volumScaler.rect = CGRectMake(0, 0, contentSize.width, self.redVolumLayer.gg_height);
     self.volumScaler.barWidth = shapeWidth;
+    
     self.mLineIndexLayer.gg_width = contentSize.width;
     
 }
@@ -269,11 +332,24 @@
 {
     _scrollView.frame = CGRectMake(0, 0, frame.size.width, frame.size.height);
     _backScrollView.frame = CGRectMake(0, 0, frame.size.width, frame.size.height);
+    self.backCanvas.frame = CGRectMake(0, 0, frame.size.width, frame.size.height);
 }
 //设置成交量层
 - (void)setVolumRect:(CGRect)rect{
     self.redVolumLayer.frame = rect;
     self.greenVolumLayer.frame = rect;
+}
+
+- (CGRect)lineRect
+{
+    return CGRectMake(0, 15, self.queryPriceView.frame.size.width,     self.queryPriceView.frame.size.height * _kLineProportion);
+}
+
+- (CGRect)volumRect
+{
+    CGRect lineRect = [self lineRect];
+    
+    return CGRectMake(0, CGRectGetMaxY(lineRect) + 13,     self.queryPriceView.frame.size.width,self.queryPriceView.frame.size.height - CGRectGetMaxY(lineRect) - 13);
 }
 
 #pragma mark -------------------
@@ -312,7 +388,8 @@
     if (index + _kLineCountVisibale > _kLineArray.count) { len = _kLineArray.count - index; }
 
     NSRange range = NSMakeRange(index, len);
-
+    tempRange = range;
+    
     // 更新视图
     [self updateMinuteLayerWithRange:range];
     [self updateVolumLayerWithRange:range];
@@ -427,7 +504,7 @@
     //--------------------- 方案二
     NSMutableArray *array = [NSMutableArray array];
     for (BitTimeModel *model in _kLineArray) {
-        [array addObject: @(model.price)];
+        [array addObject:@(model.price)];
     }
     [[bgView viewWithTag:100] removeFromSuperview];
 
@@ -459,9 +536,167 @@
     [lineChart drawLineChart];
     [self.scrollView addSubview:lineChart];
 
+    //最新价格线
+    CGFloat max = FLT_MIN;
+    CGFloat min = FLT_MAX;
+    int minIndex = 0;
+    int maxIndex = 0;
+    for (int i = 0; i<line.dataAry.count; i++) {
+        double price = [line.dataAry[i] floatValue];
+        if (price>max) {
+            max = price;
+            maxIndex = i;
+        }
+        if (price<min) {
+            min = price;
+            minIndex = i;
+        }
+    }
+    
+    CGPoint point0 = line.lineBarScaler.linePoints[minIndex];
+    double price0 = [line.dataAry[minIndex] doubleValue];
+    CGPoint point1 = line.lineBarScaler.linePoints[maxIndex];
+    double price1 = [line.dataAry[maxIndex] doubleValue];
+
+    double ratio = (point1.y-point0.y)/(price0-price1);
+    double priceLast = [[array lastObject] doubleValue];
+
+    double y = (price0-priceLast)*ratio+point0.y;
+    if (y < 0) {
+        y = 0;
+    }else if (y>lineChart.gg_height){
+        y = lineChart.gg_height;
+    }
+    self.lineRenderer.width = 2.f;
+    self.lineRenderer.color = C_HEX(0x86beff);
+    self.lineRenderer.dashPattern = @[@3, @3];
+    
+//    float xLine = 0.0;
+//    float width = bgView.gg_width;
+//    if (_scrollView.contentOffset.x < 0){
+//        xLine = -_scrollView.contentOffset.x;
+//    }else if (_scrollView.contentSize.width -_scrollView.contentOffset.x < bgView.gg_width){
+//        width = _scrollView.contentSize.width - _scrollView.contentOffset.x;
+//    }
+    self.lineRenderer.line = GGLineMake(0, y, bgView.gg_width, y);
+    [self.backCanvas setNeedsDisplay];
 }
 
 #pragma mark - 手势
+/** 长按十字星 */
+- (void)longPressViewOnGesturer:(UILongPressGestureRecognizer *)recognizer
+{
+    if (recognizer.state == UIGestureRecognizerStateEnded) {
+        
+        self.queryPriceView.hidden = YES;
+    }
+    else if (recognizer.state == UIGestureRecognizerStateBegan) {
+        
+        CGPoint velocity = [recognizer locationInView:self.queryPriceView];
+        velocity.y += self.queryPriceView.gg_top;
+        self.queryPriceView.hidden = NO;
+//        [self.queryPriceView.cirssLayer addRenderer:self.avgCircle];
+//        [self.queryPriceView.cirssLayer addRenderer:self.priceCircle];
+        [self updateQueryLayerWithPoint:velocity];
+    }
+    else if (recognizer.state == UIGestureRecognizerStateChanged) {
+        
+        CGPoint velocity = [recognizer locationInView:self.queryPriceView];
+        velocity.y += self.queryPriceView.gg_top;
+        [self updateQueryLayerWithPoint:velocity];
+    }
+}
+
+/** 更新十字星查价框 */
+- (void)updateQueryLayerWithPoint:(CGPoint)velocity
+{
+    CGFloat max = FLT_MIN;
+    CGFloat min = FLT_MAX;
+    for (NSInteger i = tempRange.location; i<tempRange.location+tempRange.length; i++) {
+        BitTimeModel *model = (BitTimeModel *)_kLineArray[i];
+        max = model.ggTimePrice>max?model.ggTimePrice:max;
+        min = model.ggTimePrice<min?model.ggTimePrice:min;
+    }
+    
+    self.lineScaler.max = max;
+    self.lineScaler.min = min;
+    self.lineScaler.rect = CGRectMake(0, 0, bgView.gg_width, bgView.gg_height);
+    NSMutableArray *array = [NSMutableArray array];
+    for (BitTimeModel *model in _kLineArray) {
+        [array addObject: @(model.price)];
+    }
+    self.lineScaler.dataAry = array;
+    [self.lineScaler updateScalerWithRange:tempRange];
+    
+    for (int i = 0; i < tempRange.length; i++) {
+        CGPoint point1 = self.lineScaler.linePoints[i];
+        NSLog(@"%f==%f",point1.x,point1.y);
+    }
+    
+    NSInteger count = tempRange.length;//self.timeType == TimeDay ? _bottomTitleArray.count * 240 : 240;
+    NSInteger index = velocity.x / (bgView.frame.size.width / count);
+    index = index >= tempRange.length - 1 ? tempRange.length - 1 : index;
+
+    id <MinuteAbstract, QueryViewAbstract> kData = self.kLineArray[index];
+    
+    NSString * yString = @"";
+    CGRect lineRect = [self lineRect];
+    CGRect volumRect = [self volumRect];
+    self.queryPriceView.xAxisOffsetY = CGRectGetMaxY(lineRect) - self.queryPriceView.gg_top + 2;
+    if (CGRectContainsPoint(lineRect, velocity)) {
+        
+        yString = [NSString stringWithFormat:@"%.2f", [self.lineScaler getPriceWithYPixel:velocity.y]];
+    }
+    else if (CGRectContainsPoint(volumRect, velocity)) {
+        
+//        yString = [NSString stringWithFormat:@"%.2f手", [self.barScaler getPriceWithYPixel:velocity.y]];
+    }
+
+    
+    NSString * title = [self getDateString:kData.ggTimeDate];
+    [self.queryPriceView setYString:yString setXString:title];
+    [self.queryPriceView.queryView setQueryData:kData];
+    
+//
+//    NSString * yString = @"";
+//
+//    CGRect lineRect = [self lineRect];
+//    CGRect volumRect = [self volumRect];
+//
+//    self.queryPriceView.xAxisOffsetY = CGRectGetMaxY(lineRect) - self.queryPriceView.gg_top + 2;
+//
+//    if (CGRectContainsPoint(lineRect, velocity)) {
+//
+//        yString = [NSString stringWithFormat:@"%.2f", [self.lineScaler getPriceWithYPixel:velocity.y]];
+//    }
+//    else if (CGRectContainsPoint(volumRect, velocity)) {
+//
+//        yString = [NSString stringWithFormat:@"%.2f手", [self.barScaler getPriceWithYPixel:velocity.y]];
+//    }
+//
+//    NSString * format = self.timeType == TimeDay ? @"yyyy:MM:dd HH:mm" : @"HH:mm";
+//    [self.queryPriceView setYString:yString setXString:[[self.objTimeAry[index] ggTimeDate] stringWithFormat:format]];
+//    [self.queryPriceView.queryView setQueryData:kData];
+//
+    CGPoint point = self.lineScaler.linePoints[index];
+//    CGPoint avgPoint = self.averageScaler.linePoints[index];
+//    self.avgCircle.circle = GGCirclePointMake(CGPointMake(avgPoint.x, avgPoint.y - self.queryPriceView.gg_top), 2);
+//    self.priceCircle.circle = GGCirclePointMake(CGPointMake(point.x, point.y - self.queryPriceView.gg_top), 2);
+//    self.avgCircle.fillColor = [UIColor redColor];//self.avgColor;
+//    self.priceCircle.fillColor = self.lineColor;
+    NSLog(@"========%f=%f==%f",point.x,point.y,self.queryPriceView.gg_top);
+    [self.queryPriceView setCenterPoint:CGPointMake(point.x-bgView.gg_width*(tempRange.location/_kLineCountVisibale), velocity.y - self.queryPriceView.gg_top)];
+}
+
+
+/** 日期转字符串 */
+- (NSString *)getDateString:(NSDate *)date
+{
+    NSDateFormatter * showFormatter = [[NSDateFormatter alloc] init];
+    showFormatter.dateFormat = @"yyyy-MM-dd";
+    return [showFormatter stringFromDate:date];
+}
+
 
 /** 放大手势 */
 -(void)pinchesViewOnGesturer:(UIPinchGestureRecognizer *)recognizer
@@ -596,6 +831,11 @@ GGLazyGetMethod(CAShapeLayer, greenVolumLayer);
 GGLazyGetMethod(DBarScaler, volumScaler);
 
 GGLazyGetMethod(DLineScaler, lineScaler);
+
+GGLazyGetMethod(GGLineRenderer, lineRenderer);
+GGLazyGetMethod(GGCanvas, backCanvas);
+
+GGLazyGetMethod(CrissCrossQueryView, queryPriceView);
 
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];
