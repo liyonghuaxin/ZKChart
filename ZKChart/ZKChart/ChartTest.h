@@ -27,8 +27,8 @@
 
 @property (nonatomic , strong) NSNumber *transactionAmount;
 @property (nonatomic , strong) NSNumber *marketValue;
-@property (nonatomic , strong) NSNumber *timestamp;
 @property (nonatomic , strong) NSNumber *priceUsd;
+@property (nonatomic , assign) NSTimeInterval myTimestamp;
 
 @end
 
@@ -37,8 +37,8 @@
 @property (nonatomic, readonly) UIScrollView * scrollView;  ///< 滚动视图
 @property (nonatomic, strong, readonly) UIScrollView * backScrollView;  ///< 背景滚动
 
-@property (nonatomic, strong) CAShapeLayer * redVolumLayer;   ///< 红色成交量
-@property (nonatomic, strong) CAShapeLayer * greenVolumLayer;     ///< 绿色成交量
+@property (nonatomic, strong) CAShapeLayer * redVolumLayer;   ///< 红色成交量layer层
+@property (nonatomic, strong) CAShapeLayer * greenVolumLayer;     ///< 绿色成交量layer层
 
 @property (nonatomic, strong) DBarScaler * volumScaler;   ///< 成交量定标器
 @property (nonatomic, strong) DLineScaler * lineScaler;     ///< 分时线定标器

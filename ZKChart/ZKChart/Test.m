@@ -90,7 +90,7 @@
         obj.ggDate = [NSDate dateWithString:obj.date format:@"yyyy-MM-dd HH:mm:ss"];
     }];
     
-    MinuteChart * timeChart = [[MinuteChart alloc] initWithFrame:CGRectMake(10, 80, self.view.frame.size.width - 20, 250)];
+    MinuteChart * timeChart = [[MinuteChart alloc] initWithFrame:CGRectMake(10, 100, self.view.frame.size.width - 20, 250)];
     [timeChart setMinuteTimeArray:timeAry timeChartType:TimeDay];
     
     [self.view addSubview:timeChart];
