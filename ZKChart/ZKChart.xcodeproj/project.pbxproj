@@ -16,6 +16,7 @@
 		040182FC2126C715005C1C25 /* SlideTabView.m in Sources */ = {isa = PBXBuildFile; fileRef = 040182FB2126C715005C1C25 /* SlideTabView.m */; };
 		040182FF2126C733005C1C25 /* BaseBitChart.m in Sources */ = {isa = PBXBuildFile; fileRef = 040182FE2126C733005C1C25 /* BaseBitChart.m */; };
 		040183042126CA8C005C1C25 /* 600887_five_day.json in Resources */ = {isa = PBXBuildFile; fileRef = 040183032126CA8C005C1C25 /* 600887_five_day.json */; };
+		0430A58A21B51CDE005253CA /* ZKMinuteView.m in Sources */ = {isa = PBXBuildFile; fileRef = 0430A58921B51CDE005253CA /* ZKMinuteView.m */; };
 		049ADC6B2116AC6C00132C02 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 049ADC6A2116AC6C00132C02 /* AppDelegate.m */; };
 		049ADC6E2116AC6C00132C02 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 049ADC6D2116AC6C00132C02 /* ViewController.m */; };
 		049ADC712116AC6C00132C02 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 049ADC6F2116AC6C00132C02 /* Main.storyboard */; };
@@ -201,6 +202,8 @@
 		040182FD2126C733005C1C25 /* BaseBitChart.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BaseBitChart.h; sourceTree = "<group>"; };
 		040182FE2126C733005C1C25 /* BaseBitChart.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BaseBitChart.m; sourceTree = "<group>"; };
 		040183032126CA8C005C1C25 /* 600887_five_day.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = 600887_five_day.json; sourceTree = "<group>"; };
+		0430A58821B51CDE005253CA /* ZKMinuteView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ZKMinuteView.h; sourceTree = "<group>"; };
+		0430A58921B51CDE005253CA /* ZKMinuteView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ZKMinuteView.m; sourceTree = "<group>"; };
 		049ADC662116AC6C00132C02 /* ZKChart.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ZKChart.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		049ADC692116AC6C00132C02 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		049ADC6A2116AC6C00132C02 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -592,6 +595,8 @@
 			children = (
 				049ADC6C2116AC6C00132C02 /* ViewController.h */,
 				049ADC6D2116AC6C00132C02 /* ViewController.m */,
+				0430A58821B51CDE005253CA /* ZKMinuteView.h */,
+				0430A58921B51CDE005253CA /* ZKMinuteView.m */,
 				049ADE7B2116BC5000132C02 /* ChartTest.h */,
 				049ADE7C2116BC5000132C02 /* ChartTest.m */,
 				040182E82126C591005C1C25 /* Test.h */,
@@ -1557,6 +1562,7 @@
 				049ADE212116AC8A00132C02 /* QueryCanvas.m in Sources */,
 				049ADE372116AC8A00132C02 /* KDJLayer.m in Sources */,
 				049ADE1A2116AC8A00132C02 /* PieCanvas.m in Sources */,
+				0430A58A21B51CDE005253CA /* ZKMinuteView.m in Sources */,
 				049ADDFE2116AC8A00132C02 /* RadarDataSet.m in Sources */,
 				049ADE412116AC8A00132C02 /* lauxlib.c in Sources */,
 				049ADE482116AC8A00132C02 /* lvm.c in Sources */,
