@@ -232,49 +232,27 @@ typedef enum : NSUInteger {
         
         curPriceArray = [NSMutableArray array];
         curMarketValueArray = [NSMutableArray array];
-        
-        [self initSubviews];
-        [self requestData];
-        
     }
     return self;
 }
 
-- (void)requestData{
-    NSMutableArray *array = [NSMutableArray array];
-    AFHTTPSessionManager *sessionManager = [AFHTTPSessionManager manager];
-    [sessionManager GET:@"https://fastmarket.niuyan.com/api/v4/app/coin/chart?coin_id=bitcoin&lan=zh-cn&type=1m" parameters:nil progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        NSDictionary *dataDic = responseObject[@"data"];
-        NSArray *dataArr = dataDic[@"data"];
-        for (NSArray *arr in dataArr) {
-            BitTimeModel *model = [[BitTimeModel alloc] init];
-            model.priceUsd = arr[1];
-            model.transactionAmount = arr[3];
-            model.marketValue = arr[4];
-            model.ggDate = [NSDate dateWithTimeIntervalSince1970:[arr[0] doubleValue]];
-            [array addObject:model];
-        }
-        _kLineArray = array;
-        [self updateKLineTitles:array];
-        
-        //定标器
-        self.volumScaler = [[DBarScaler alloc] init];
-        [self.volumScaler setObjAry:_kLineArray
-                        getSelector:@selector(ggTransactionAmount)];
-        self.volumScaler.rect = CGRectMake(0, 0, self.redVolumLayer.gg_width, self.redVolumLayer.gg_height);
-        self.volumScaler.barWidth = shapeWidth;//成交额模型宽度
-        
-        [self updateChart];
-        
-        
-    } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        
-    }];
+- (void)updateDataWithArray:(NSArray *)array{
+    _kLineArray = array;
+    [self updateKLineTitles:array];
+    //定标器
+    self.volumScaler = [[DBarScaler alloc] init];
+    [self.volumScaler setObjAry:_kLineArray
+                    getSelector:@selector(ggTransactionAmount)];
+    self.volumScaler.rect = CGRectMake(0, 0, self.redVolumLayer.gg_width, self.redVolumLayer.gg_height);
+    self.volumScaler.barWidth = shapeWidth;//成交额模型宽度
+    
+    [self updateChart];
 }
 
 static void * kLineTitle = "keyTitle";
 
 - (void)updateKLineTitles:(NSArray<id<MinuteAbstract, VolumeAbstract, QueryViewAbstract>> *)kLineArray{
+
 //    if (_kStyle == KLineTypeDay) {
 //
 //    }else if (_kStyle == KLineTypeWeek) {
@@ -321,6 +299,20 @@ static void * kLineTitle = "keyTitle";
     self.scrollView.contentSize = contentSize;
     self.backScrollView.contentSize = contentSize;
     
+    //查价层
+    self.queryPriceView.frame = CGRectMake(0, 0, chartWidth, chartHeight);
+    self.queryPriceView.queryView.hidden = YES;
+    [self addSubview:self.queryPriceView];
+    
+    if (_isShowLargeBtn) {
+        //放大按钮
+        UIButton *largeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        [largeBtn setImage:[UIImage imageNamed:@"large"] forState:UIControlStateNormal];
+        largeBtn.frame = CGRectMake(self.frame.size.width-10-25, self.volumRect.origin.y, 25, 25);
+        [largeBtn addTarget:self action:@selector(larginAction) forControlEvents:UIControlEventTouchUpInside];
+        [self addSubview:largeBtn];
+    }
+
     _stringLayer = [[GGCanvas alloc] init];
     _stringLayer.frame = CGRectMake(0, 0, chartWidth, chartHeight);
     [self.layer addSublayer:_stringLayer];
@@ -335,11 +327,6 @@ static void * kLineTitle = "keyTitle";
     [self.layer addSublayer:self.backCanvas];
     self.backCanvas.frame = CGRectMake(0, 0, chartWidth, chartHeight);
     [self.backCanvas addRenderer:self.lineRenderer];
-    
-    //查价层
-    self.queryPriceView.frame = CGRectMake(0, 0, chartWidth, chartHeight);
-    self.queryPriceView.queryView.hidden = YES;
-    [self addSubview:self.queryPriceView];
     
     //手势
     UIPinchGestureRecognizer * pinchGestureRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinchesViewOnGesturer:)];
@@ -362,20 +349,22 @@ static void * kLineTitle = "keyTitle";
 
 }
 
-#pragma mark - 更新视图
+- (void)larginAction{
+    if (_largeBlock) {
+        _largeBlock();
+    }
+}
 
+#pragma mark - 更新视图
+//更新UI
 - (void)updateChart
 {
     if (_kLineArray.count == 0) { return; }
-    
-    //渲染器  画布 颜色等属性
-    //    [self baseConfigRendererAndLayer];
-    
+    [self initSubviews];
     [self subLayerRespond];
-    //    [self updateMinuteLine];
-    
 }
 
+//配置、更新数据
 - (void)subLayerRespond
 {
     [self baseConfigLayer];
@@ -829,7 +818,7 @@ static void * kLineTitle = "keyTitle";
         _kLineCountVisibale = _kLineCountVisibale > _kMaxCountVisibale ? _kMaxCountVisibale : _kLineCountVisibale;
         
         [self subLayerRespond];
-        
+
         // 定位中间的k线
         CGFloat shape_x = (_zoomCenterIndex + .5) * shapeInterval + (_zoomCenterIndex + .5) * shapeWidth;
         CGFloat offsetX = shape_x - _zoomCenterSpacingLeft;

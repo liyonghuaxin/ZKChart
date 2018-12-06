@@ -36,6 +36,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface ZKMinuteView : UIView
 
+@property (nonatomic, copy) void(^largeBlock)(void);
+@property (nonatomic, assign) BOOL isShowLargeBtn;
+
 @property (nonatomic, readonly) UIScrollView * scrollView;  ///< 滚动视图
 @property (nonatomic, strong, readonly) UIScrollView * backScrollView;  ///< 背景滚动
 
@@ -49,6 +52,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) UIColor * axisStringColor;      ///< 文字颜色
 @property (nonatomic, strong) UIFont * axisFont;        ///< 轴字体
 @property (nonatomic, assign) NSUInteger mAxisSplit;        ///< 分时线纵轴
+
+- (void)updateChart;
+- (void)updateDataWithArray:(NSArray *)array;
 
 @end
 
