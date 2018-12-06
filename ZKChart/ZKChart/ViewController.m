@@ -29,7 +29,7 @@
     myTableView.frame = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     [self.view addSubview:myTableView];
     
-    dataArr = @[@"K线图",@"Minute线图",@"价格、市值、成交量", @"bitK线"];
+    dataArr = @[@"K线图",@"Minute线图",@"价格、市值、成交量", @"bit分时线"];
 }
 
 

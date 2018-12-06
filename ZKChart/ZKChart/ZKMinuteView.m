@@ -150,11 +150,13 @@ typedef enum : NSUInteger {
     CGSize contentSize;
     
     NSRange tempRange;
-    NSMutableArray *curLineArray;
-    
+    NSMutableArray *curPriceArray;
+    NSMutableArray *curMarketValueArray;
+
     NSInteger lineIndex;
     float lineX;
     float lineWidth;
+    BOOL isShowPrice;
 }
 @property (nonatomic, assign) TimeChartType timeType;
 
@@ -205,6 +207,8 @@ typedef enum : NSUInteger {
 -(instancetype)initWithFrame:(CGRect)frame{
     self = [super initWithFrame:frame];
     if (self) {
+        isShowPrice = YES;
+        
         chartWidth = frame.size.width;
         chartHeight = frame.size.height;
         _currentZoom = -.001f;
@@ -226,7 +230,8 @@ typedef enum : NSUInteger {
         _kMaxCountVisibale = chartWidth/(shapeWidth + _kInterval);
         _kLineCountVisibale = _kMaxCountVisibale;
         
-        curLineArray = [NSMutableArray array];
+        curPriceArray = [NSMutableArray array];
+        curMarketValueArray = [NSMutableArray array];
         
         [self initSubviews];
         [self requestData];
@@ -343,6 +348,9 @@ static void * kLineTitle = "keyTitle";
     UILongPressGestureRecognizer * longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(longPressViewOnGesturer:)];
     [self addGestureRecognizer:longPress];
     
+    UITapGestureRecognizer * tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(touchIndexLayer:)];
+    [self addGestureRecognizer:tapRecognizer];
+    
     //配置
     self.redVolumLayer.strokeColor = [UIColor redColor].CGColor;
     self.redVolumLayer.fillColor = [UIColor redColor].CGColor;
@@ -371,7 +379,7 @@ static void * kLineTitle = "keyTitle";
 - (void)subLayerRespond
 {
     [self baseConfigLayer];
-    [self updateSubLayer];
+    [self updateSubLayerIsMustUpdateLine:NO];
 }
 
 - (void)baseConfigLayer{
@@ -469,7 +477,7 @@ static void * kLineTitle = "keyTitle";
 
 #pragma mark - 实时更新
 
-- (void)updateSubLayer
+- (void)updateSubLayerIsMustUpdateLine:(BOOL)isMust
 {
     // 计算显示的在屏幕中数据的起始点、及个数
     NSInteger index = round(self.scrollView.contentOffset.x / (shapeWidth+shapeInterval));
@@ -482,10 +490,12 @@ static void * kLineTitle = "keyTitle";
     tempRange = range;
     
     //即将显示数据
-    [curLineArray removeAllObjects];
+    [curMarketValueArray removeAllObjects];
+    [curPriceArray removeAllObjects];
     for (NSUInteger i = range.location; i <range.location+range.length; i++) {
         BitTimeModel *model = _kLineArray[i];
-        [curLineArray addObject:model.priceUsd];
+        [curPriceArray addObject:model.priceUsd];
+        [curMarketValueArray addObject:model.marketValue];
     }
     
     BOOL isRefreshLine = YES;
@@ -529,7 +539,7 @@ static void * kLineTitle = "keyTitle";
         }
     }
     
-    if (isRefreshLine) {
+    if (isRefreshLine || isMust) {
         // 更新视图
         [self updateMinuteLayerWithRange:range];
     }
@@ -541,12 +551,18 @@ static void * kLineTitle = "keyTitle";
     [[self viewWithTag:100] removeFromSuperview];
     LineData * line = [[LineData alloc] init];
     line.lineWidth = 1;
-    line.lineColor = C_HEX(0x177eff);
-    line.lineFillColor = [C_HEX(0xf1f8ff) colorWithAlphaComponent:.8f];
-    line.dataAry =  curLineArray;
+    if (isShowPrice) {
+        line.dataAry =  curPriceArray;
+        line.lineColor = C_HEX(0x177eff);
+        line.lineFillColor = [C_HEX(0xf1f8ff) colorWithAlphaComponent:.8f];
+//        line.gradientFillColors = @[(__bridge id)C_HEX(0xf1f8ff).CGColor, (__bridge id)C_HEX(0xf1f8ff).CGColor];
+//        line.locations = @[@0.7, @1];
+    }else{
+        line.dataAry =  curMarketValueArray;
+        line.lineColor = C_HEX(0xfdbc55);
+        line.lineFillColor = [C_HEX(0xfffbf2) colorWithAlphaComponent:.8f];
+    }
     line.dataFormatter = @"%.f 分";
-    line.gradientFillColors = @[(__bridge id)C_HEX(0xf1f8ff).CGColor, (__bridge id)C_HEX(0xf1f8ff).CGColor];
-    line.locations = @[@0.7, @1];
     line.shapeLineWidth = 1;
     //    line.dashPattern = @[@2, @2];//折线虚线样式
     self.lineScaler = line.lineBarScaler;
@@ -564,7 +580,14 @@ static void * kLineTitle = "keyTitle";
     //lyh debug
 //    lineChart.backgroundColor = [UIColor blackColor];
     
-    //最新价格线
+    //-------------最新价格线----------------
+    if (isShowPrice) {
+        self.lineRenderer.color = C_HEX(0x86beff);
+    }else{
+        self.lineRenderer.color = [UIColor clearColor];
+        [self.backCanvas setNeedsDisplay];
+        return;
+    }
     CGFloat max = FLT_MIN;
     CGFloat min = FLT_MAX;
     int minIndex = 0;
@@ -600,7 +623,6 @@ static void * kLineTitle = "keyTitle";
     self.lineRenderer.width = 2.f;
     self.lineRenderer.color = C_HEX(0x86beff);
     self.lineRenderer.dashPattern = @[@3, @3];
-    
     self.lineRenderer.line = GGLineMake(0, y, self.gg_width, y);
     [self.backCanvas setNeedsDisplay];
 }
@@ -683,6 +705,15 @@ static void * kLineTitle = "keyTitle";
 }
 
 #pragma mark - 手势
+- (void)touchIndexLayer:(UILongPressGestureRecognizer *)recognizer{
+    CGPoint velocity = [recognizer locationInView:self];
+    CGRect lineRect = [self lineRect];
+    if (CGRectContainsPoint(lineRect, velocity)) {
+        isShowPrice = !isShowPrice;
+        [self updateSubLayerIsMustUpdateLine:YES];
+    }
+}
+
 /** 长按十字星 */
 - (void)longPressViewOnGesturer:(UILongPressGestureRecognizer *)recognizer
 {
@@ -872,7 +903,7 @@ static void * kLineTitle = "keyTitle";
     
     [self.backScrollView setContentOffset:contentOffset];
     
-    [self updateSubLayer];
+    [self updateSubLayerIsMustUpdateLine:NO];
     
 }
 
