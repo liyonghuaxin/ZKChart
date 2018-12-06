@@ -48,6 +48,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) GGCanvas * stringLayer;
 @property (nonatomic, strong) UIColor * axisStringColor;      ///< 文字颜色
 @property (nonatomic, strong) UIFont * axisFont;        ///< 轴字体
+@property (nonatomic, assign) NSUInteger mAxisSplit;        ///< 分时线纵轴
 
 @end
 

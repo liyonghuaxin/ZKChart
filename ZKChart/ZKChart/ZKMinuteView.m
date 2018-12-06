@@ -145,9 +145,6 @@ typedef enum : NSUInteger {
     float chartWidth;
     float chartHeight;
     
-    UIView *bgView;
-    
-    //BaseShapeScaler
     CGFloat shapeWidth;
     CGFloat shapeInterval;
     CGSize contentSize;
@@ -188,9 +185,9 @@ typedef enum : NSUInteger {
 @property (nonatomic, strong) CrissCrossQueryView * queryPriceView;     ///< 查价层
 @property (nonatomic, assign) NSUInteger dirAxisSplitCount;     ///< 单向轴分割数
 
-//@property (nonatomic, strong) NSArray * bottomTitleArray;       ///< 底部轴
-//@property (nonatomic, strong) GGAxisRenderer * bottomRenderer;  ///< 底部轴
 @property (nonatomic, strong) GGAxisRenderer * axisRenderer;        ///< 轴渲染
+@property (nonatomic, strong) GGAxisRenderer * kAxisRenderer;       ///< 分时线轴
+@property (nonatomic, strong) GGAxisRenderer * vAxisRenderer;       ///< 成交量轴
 
 @end
 
@@ -211,16 +208,18 @@ typedef enum : NSUInteger {
         chartWidth = frame.size.width;
         chartHeight = frame.size.height;
         _currentZoom = -.001f;
-        _kLineProportion = .73f;
+        _kLineProportion = .65f;
         _dirAxisSplitCount = 2;
         
         _kInterval = 3;//模型间距
         shapeInterval = _kInterval;//间距
         shapeWidth = 2;//模型“默认”宽度
         
+        _mAxisSplit = 3;
+
         _axisStringColor = C_HEX(0xaeb1b6);
         //lyh debug
-//        _axisStringColor = [UIColor blueColor];
+//        _axisStringColor = [UIColor orangeColor];
         _axisFont = [UIFont fontWithName:FONT_ARIAL size:10];
 
         _kMinCountVisibale = 12;
@@ -237,27 +236,6 @@ typedef enum : NSUInteger {
 }
 
 - (void)requestData{
-    /*
-     //数据
-     NSData *dataStock = [NSData dataWithContentsOfFile:[self stockWeekDataJsonPath]];
-     NSArray *stockJson = [NSJSONSerialization JSONObjectWithData:dataStock options:0 error:nil];
-     NSArray <MinuteAbstract, VolumeAbstract> * timeAry = (NSArray <MinuteAbstract, VolumeAbstract> *) [BaseModel arrayForArray:stockJson class:[BitTimeModel class]];
-     [timeAry enumerateObjectsUsingBlock:^(BitTimeModel * obj, NSUInteger idx, BOOL * _Nonnull stop) {
-     obj.ggDate = [NSDate dateWithString:obj.date format:@"yyyy-MM-dd HH:mm:ss"];
-     }];
-     _kLineArray = timeAry;
-     
-     //定标器
-     self.volumScaler = [[DBarScaler alloc] init];
-     [self.volumScaler setObjAry:_kLineArray
-     getSelector:@selector(ggVolume)];
-     self.volumScaler.rect = CGRectMake(0, 0, self.redVolumLayer.gg_width, self.redVolumLayer.gg_height);
-     self.volumScaler.barWidth = shapeWidth;//lyh 最窄1?
-     
-     [self updateChart];
-     
-     */
-    
     NSMutableArray *array = [NSMutableArray array];
     AFHTTPSessionManager *sessionManager = [AFHTTPSessionManager manager];
     [sessionManager GET:@"https://fastmarket.niuyan.com/api/v4/app/coin/chart?coin_id=bitcoin&lan=zh-cn&type=1m" parameters:nil progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
@@ -316,18 +294,14 @@ static void * kLineTitle = "keyTitle";
 
 - (void)initSubviews{
     
-    //UI
-    bgView = [[UIView alloc] init];
-    bgView.frame = CGRectMake(0, 0, chartWidth, chartHeight);
-    [self addSubview:bgView];
     //lyh debug
-//    bgView.backgroundColor = [UIColor lightGrayColor];
+//    self.backgroundColor = [UIColor lightGrayColor];
     
     _backScrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, chartWidth, chartHeight)];
     _backScrollView.showsHorizontalScrollIndicator = NO;
     _backScrollView.showsVerticalScrollIndicator = NO;
     _backScrollView.userInteractionEnabled = NO;
-    [bgView addSubview:_backScrollView];
+    [self addSubview:_backScrollView];
     
     _scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0,chartWidth, chartHeight)];
     _scrollView.showsHorizontalScrollIndicator = NO;
@@ -335,7 +309,7 @@ static void * kLineTitle = "keyTitle";
     _scrollView.delegate = self;
     [_scrollView.layer addSublayer:self.redVolumLayer];
     [_scrollView.layer addSublayer:self.greenVolumLayer];
-    [bgView addSubview:_scrollView];
+    [self addSubview:_scrollView];
     
     //计算scrollview的contentsize
     contentSize = CGSizeMake((shapeInterval + shapeWidth) * _kLineArray.count, chartHeight);
@@ -344,29 +318,30 @@ static void * kLineTitle = "keyTitle";
     
     _stringLayer = [[GGCanvas alloc] init];
     _stringLayer.frame = CGRectMake(0, 0, chartWidth, chartHeight);
-//    [_scrollView.layer addSublayer:_stringLayer];
     [self.layer addSublayer:_stringLayer];
     self.axisRenderer.width = 0.25;
     [self.stringLayer addRenderer:self.axisRenderer];
+    self.kAxisRenderer.width = 0.25;
+    [self.stringLayer addRenderer:self.kAxisRenderer];
+    self.vAxisRenderer.width = 0.25;
+    [self.stringLayer addRenderer:self.vAxisRenderer];
     
     //网格背景
-    [bgView.layer addSublayer:self.backCanvas];
+    [self.layer addSublayer:self.backCanvas];
     self.backCanvas.frame = CGRectMake(0, 0, chartWidth, chartHeight);
     [self.backCanvas addRenderer:self.lineRenderer];
     
-    
-    //    [self.backCanvas addRenderer:self.bottomRenderer];
-    
     //查价层
     self.queryPriceView.frame = CGRectMake(0, 0, chartWidth, chartHeight);
-    [bgView addSubview:self.queryPriceView];
+    self.queryPriceView.queryView.hidden = YES;
+    [self addSubview:self.queryPriceView];
     
     //手势
     UIPinchGestureRecognizer * pinchGestureRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinchesViewOnGesturer:)];
-    [bgView addGestureRecognizer:pinchGestureRecognizer];
+    [self addGestureRecognizer:pinchGestureRecognizer];
     
     UILongPressGestureRecognizer * longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(longPressViewOnGesturer:)];
-    [bgView addGestureRecognizer:longPress];
+    [self addGestureRecognizer:longPress];
     
     //配置
     self.redVolumLayer.strokeColor = [UIColor redColor].CGColor;
@@ -376,23 +351,7 @@ static void * kLineTitle = "keyTitle";
     
     //确定redVolumLayer 和 greenVolumLayer的frame
     [self setVolumRect:self.volumRect];//确定 redVolumLayer greenVolumLayer 的frame
-    
-    //bgView上的view 从下到上
-    //    bgView.backgroundColor = [UIColor redColor];
-    //_backScrollView.backgroundColor = [UIColor blueColor];//背景滚动
-    //_scrollView.backgroundColor = [UIColor purpleColor];
-    //    _stringLayer.backgroundColor = [UIColor cyanColor].CGColor;
-    //    _queryPriceView.backgroundColor = [UIColor greenColor];
-    
-    //scrollView上字view  lineChart
-    //scrollView addSubview:lineChart   bgView.gg_height*_kLineProportion
-    
-    //网格背景层
-    // _backScrollView.layer addSublayer:self.backCanvas];
-    
-    //_scrollView的layer上   从下到上
-    //    self.redVolumLayer.backgroundColor = [UIColor brownColor].CGColor;
-    //    self.greenVolumLayer.backgroundColor = [UIColor grayColor].CGColor;
+
 }
 
 #pragma mark - 更新视图
@@ -412,37 +371,15 @@ static void * kLineTitle = "keyTitle";
 - (void)subLayerRespond
 {
     [self baseConfigLayer];
-    [self configLineScaler];
-    
     [self updateSubLayer];
 }
 
-- (void)configLineScaler{
-    //    self.lineScaler.max = _KTimeChartMaxPrice;
-    //    self.lineScaler.min = _KTimeChartMinPrice;
-    //    self.lineScaler.xMaxCount = _kLineCountVisibale;
-    //    self.lineScaler.xRatio = 0;
-}
-
-//- (void)updateMinuteLine{
-//    runMainThreadWithBlock(^{
-//        [_mLineIndexLayer removeFromSuperlayer];
-//        _mLineIndexLayer = [[BaseIndexLayer alloc] init];
-//        _mLineIndexLayer.frame = CGRectMake(0, 0, contentSize.width, bgView.gg_height*_kLineProportion);
-//        [_mLineIndexLayer setKLineArray:_kLineArray];
-//        _mLineIndexLayer.currentKLineWidth = shapeWidth;
-//        [self.scrollView.layer addSublayer:_mLineIndexLayer];
-//
-//        [self updateSubLayer];
-//    });
-//}
-
 - (void)baseConfigLayer{
-    shapeWidth = bgView.gg_width / _kLineCountVisibale - _kInterval;
+    shapeWidth = self.gg_width / _kLineCountVisibale - _kInterval;
     shapeInterval = _kInterval;
     
     contentSize = CGSizeMake((shapeWidth+shapeInterval)*_kLineArray.count,self.gg_height);
-    contentSize.width = contentSize.width < bgView.gg_width ? bgView.gg_width : contentSize.width;
+    contentSize.width = contentSize.width < self.gg_width ? self.gg_width : contentSize.width;
     
     self.scrollView.contentSize = contentSize;
     self.backScrollView.contentSize = contentSize;
@@ -461,20 +398,43 @@ static void * kLineTitle = "keyTitle";
     self.axisRenderer.strColor = _axisStringColor;
     self.axisRenderer.showLine = NO;
     self.axisRenderer.strFont = _axisFont;
+    // 分时线线Y轴设置
+    self.kAxisRenderer.strColor = _axisStringColor;
+    self.kAxisRenderer.showLine = NO;
+    self.kAxisRenderer.strFont = _axisFont;
+    self.kAxisRenderer.offSetRatio = GGRatioTopRight;
+    // 成交量Y轴设置
+    self.vAxisRenderer.strColor = _axisStringColor;
+    self.vAxisRenderer.showLine = NO;
+    self.vAxisRenderer.strFont = _axisFont;
+    self.vAxisRenderer.offSetRatio = GGRatioTopRight;
+    //Y轴值
+    __weak ZKMinuteView * weakSelf = self;
+    [self.kAxisRenderer setStringBlock:^NSString *(CGPoint point, NSInteger index, NSInteger max) {
+//        if (index == 0) { return @""; }
+        point.y = point.y - self.lineRect.origin.y;
+        return [NSString stringWithFormat:@"%.2f", [weakSelf.lineScaler getPriceWithPoint:point]];
+    }];
+    [self.vAxisRenderer setStringBlock:^NSString *(CGPoint point, NSInteger index, NSInteger max) {
+//        if (index == 0) { return @""; }
+        point.y = point.y - weakSelf.redVolumLayer.gg_top;
+        NSString *priceStr = [NSString stringWithFormat:@"%f",[weakSelf.volumScaler getPriceWithYPixel:point.y]];
+        return [NSString stringWithFormat:@"%@",priceStr];
+    }];
 }
 
 #pragma mark - rect
 
 - (CGRect)lineRect
 {
-    return CGRectMake(0, INDEX_STRING_INTERVAL, bgView.frame.size.width, bgView.frame.size.height * _kLineProportion - INDEX_STRING_INTERVAL);
+    return CGRectMake(0, INDEX_STRING_INTERVAL, self.frame.size.width, self.frame.size.height * _kLineProportion - INDEX_STRING_INTERVAL);
 }
 
 //成交额frame
 - (CGRect)volumRect{
     CGFloat highMLine = self.lineRect.size.height;
     CGFloat volumTop = INDEX_STRING_INTERVAL * 2 + highMLine;
-    return CGRectMake(0, volumTop, contentSize.width, bgView.frame.size.height - volumTop - KLINE_VOLUM_INTERVAL);
+    return CGRectMake(0, volumTop, contentSize.width, self.frame.size.height - volumTop - KLINE_VOLUM_INTERVAL);
 }
 
 //设置成交量层/成交额层
@@ -530,7 +490,7 @@ static void * kLineTitle = "keyTitle";
     
     BOOL isRefreshLine = YES;
     //isRefreshLine 主要是解决分时线和底部x轴卡顿现象
-    if (![bgView viewWithTag:100]) {
+    if (![self viewWithTag:100]) {
         //第一次绘制
         isRefreshLine = YES;
         lineX = (shapeWidth+shapeInterval)/2.0;
@@ -578,14 +538,14 @@ static void * kLineTitle = "keyTitle";
 }
 
 - (void)updateMinuteLayerWithRange:(NSRange)range{
-    [[bgView viewWithTag:100] removeFromSuperview];
+    [[self viewWithTag:100] removeFromSuperview];
     LineData * line = [[LineData alloc] init];
     line.lineWidth = 1;
     line.lineColor = C_HEX(0x177eff);
     line.lineFillColor = [C_HEX(0xf1f8ff) colorWithAlphaComponent:.8f];
     line.dataAry =  curLineArray;
     line.dataFormatter = @"%.f 分";
-    line.gradientFillColors = @[(__bridge id)C_HEX(0xf1f8ff).CGColor, (__bridge id)[UIColor whiteColor].CGColor];
+    line.gradientFillColors = @[(__bridge id)C_HEX(0xf1f8ff).CGColor, (__bridge id)C_HEX(0xf1f8ff).CGColor];
     line.locations = @[@0.7, @1];
     line.shapeLineWidth = 1;
     //    line.dashPattern = @[@2, @2];//折线虚线样式
@@ -602,7 +562,7 @@ static void * kLineTitle = "keyTitle";
     [lineChart drawLineChart];
     [self.scrollView addSubview:lineChart];
     //lyh debug
-//    lineChart.backgroundColor = [UIColor redColor];
+//    lineChart.backgroundColor = [UIColor blackColor];
     
     //最新价格线
     CGFloat max = FLT_MIN;
@@ -639,7 +599,7 @@ static void * kLineTitle = "keyTitle";
     self.lineRenderer.color = C_HEX(0x86beff);
     self.lineRenderer.dashPattern = @[@3, @3];
     
-    self.lineRenderer.line = GGLineMake(0, y, bgView.gg_width, y);
+    self.lineRenderer.line = GGLineMake(0, y, self.gg_width, y);
     [self.backCanvas setNeedsDisplay];
 }
 
@@ -651,7 +611,6 @@ static void * kLineTitle = "keyTitle";
     CGFloat min = FLT_MAX;
     
     [_kLineArray getMax:&max min:&min selGetter:@selector(ggTransactionAmount) range:range base:0.1];
-    
     // 更新成交量
     self.volumScaler.min = min;
     self.volumScaler.max = max;
@@ -682,7 +641,6 @@ static void * kLineTitle = "keyTitle";
                 GGPathAddCGRect(refRed, shape);
             }
         }
-        //        [self volumIsRed:obj] ? GGPathAddCGRect(refRed, shape) : GGPathAddCGRect(refGreen, shape);
     }
     
     self.redVolumLayer.path = refRed;
@@ -703,6 +661,22 @@ static void * kLineTitle = "keyTitle";
             [self.axisRenderer addString:title point:CGPointMake(point.x- self.scrollView.contentOffset.x, chartHeight-KLINE_VOLUM_INTERVAL)];
         }
     }
+    
+    // 分时线Y轴设置
+    CGRect rect = self.lineRect;
+    //坐标轴本身有高度，Y轴起始坐标a高于0十多像素，最高坐标也相应高出一点，这里做调整
+    rect.origin.y += 10;
+    rect.size.height -= 10;
+    GGLine leftLine = GGLeftLineRect(rect);
+    self.kAxisRenderer.axis = GGAxisLineMake(leftLine, 0, GGLengthLine(leftLine) / _mAxisSplit);
+    // 成交量Y轴设置
+    CGRect vRect = self.redVolumLayer.frame;
+    //坐标轴本身有高度，Y轴起始坐标a高于0十多像素，最高坐标也相应高出一点，这里做调整
+    vRect.origin.y += 10;
+    vRect.size.height -= 10;
+    CGFloat v_spe = vRect.size.height;
+    leftLine = GGLeftLineRect(vRect);
+    self.vAxisRenderer.axis = GGAxisLineMake(leftLine, 0, v_spe);
     [self.stringLayer setNeedsDisplay];
 }
 
@@ -716,13 +690,13 @@ static void * kLineTitle = "keyTitle";
     }
     else if (recognizer.state == UIGestureRecognizerStateBegan) {
         
-        CGPoint velocity = [recognizer locationInView:bgView];
+        CGPoint velocity = [recognizer locationInView:self];
         velocity.y += self.queryPriceView.gg_top;
         self.queryPriceView.hidden = NO;
         [self updateQueryLayerWithPoint:velocity];
     }
     else if (recognizer.state == UIGestureRecognizerStateChanged) {
-        CGPoint velocity = [recognizer locationInView:bgView];
+        CGPoint velocity = [recognizer locationInView:self];
         [self updateQueryLayerWithPoint:velocity];
     }
 }
@@ -752,19 +726,10 @@ static void * kLineTitle = "keyTitle";
     NSString * yString = @"";
     CGPoint centerPoint;
     if (CGRectContainsPoint(lineRect, velocity)) {
-        //该折线图内边距为(20,5,20,5)见BaseLineBarSet中初始化方法
-//        CGRect realLineRect = lineRect;
-//        realLineRect.origin.y += 20;
-//        realLineRect.size.height -= 40;
-//        if (CGRectContainsPoint(realLineRect, velocity)) {
-//            yString = [NSString stringWithFormat:@"%.2f", [self.lineScaler getPriceWithYPixel:velocity.y]];
-//        }
-        
-        yString = [NSString stringWithFormat:@"%.2f", [self.lineScaler getPriceWithYPixel:velocity.y]];
-        
+        yString = [NSString stringWithFormat:@"%.2f", [self.lineScaler getPriceWithYPixel:velocity.y-self.lineRect.origin.y]];
         //计算centerPoint
         NSInteger count = tempRange.length;
-        NSInteger lineIndex = velocity.x / (bgView.frame.size.width / count);
+        NSInteger lineIndex = velocity.x / (self.frame.size.width / count);
         lineIndex = lineIndex >= tempRange.length - 1 ? tempRange.length - 1 : lineIndex;
         centerPoint = self.lineScaler.linePoints[lineIndex];
         [self.queryPriceView setCenterPoint:CGPointMake(centerPoint.x, velocity.y - self.queryPriceView.gg_top)];
@@ -804,8 +769,8 @@ static void * kLineTitle = "keyTitle";
         
         recognizer.scale = _currentZoom;
         
-        CGPoint touch1 = [recognizer locationOfTouch:0 inView:bgView];
-        CGPoint touch2 = [recognizer locationOfTouch:1 inView:bgView];
+        CGPoint touch1 = [recognizer locationOfTouch:0 inView:self];
+        CGPoint touch2 = [recognizer locationOfTouch:1 inView:self];
         
         // 放大开始记录位置等数据
         CGFloat center_x = (touch1.x + touch2.x) / 2.0f;
@@ -924,8 +889,9 @@ GGLazyGetMethod(DBarScaler, volumScaler);
 GGLazyGetMethod(DLineScaler, lineScaler);
 
 GGLazyGetMethod(GGLineRenderer, lineRenderer);
-//GGLazyGetMethod(GGAxisRenderer, bottomRenderer);
 GGLazyGetMethod(GGAxisRenderer, axisRenderer);
+GGLazyGetMethod(GGAxisRenderer, kAxisRenderer);
+GGLazyGetMethod(GGAxisRenderer, vAxisRenderer);
 
 GGLazyGetMethod(GGCanvas, backCanvas);
 
