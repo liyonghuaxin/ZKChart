@@ -582,18 +582,20 @@ static void * kLineTitle = "keyTitle";
     }
     
     CGPoint point0 = line.lineBarScaler.linePoints[minIndex];
-    double price0 = [line.dataAry[minIndex] doubleValue];
+    float price0 = [line.dataAry[minIndex] floatValue];
     CGPoint point1 = line.lineBarScaler.linePoints[maxIndex];
-    double price1 = [line.dataAry[maxIndex] doubleValue];
+    float price1 = [line.dataAry[maxIndex] floatValue];
     
-    double ratio = (point1.y-point0.y)/(price0-price1);
-    double priceLast = [[curLineArray lastObject] doubleValue];
-    
-    double y = (price0-priceLast)*ratio+point0.y;
-    if (y < 0) {
-        y = 0;
-    }else if (y>lineChart.gg_height){
-        y = lineChart.gg_height;
+    float ratio = (point1.y-point0.y)/(price0-price1);
+    BitTimeModel *model = [_kLineArray lastObject];
+    float priceLast = [model.priceUsd floatValue];
+    //这里的点坐标是在lineChart坐标系，而y坐标是在backCanvas中所以要INDEX_STRING_INTERVAL
+    float y = (price0-priceLast)*ratio+point0.y+INDEX_STRING_INTERVAL;
+    //8是辅助参数，不让最低和最高点离边界太近
+    if (y < INDEX_STRING_INTERVAL) {
+        y = INDEX_STRING_INTERVAL+8;
+    }else if (y>lineChart.gg_height+INDEX_STRING_INTERVAL){
+        y = lineChart.gg_height+INDEX_STRING_INTERVAL-8;
     }
     self.lineRenderer.width = 2.f;
     self.lineRenderer.color = C_HEX(0x86beff);
